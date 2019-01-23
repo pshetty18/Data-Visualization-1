@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+    .names {
+        fill: none;
+        stroke: #fff;
+        stroke-linejoin: round;
+    }
+
+    /* Tooltip CSS */
+    .d3-tip {
+        line-height: 1.5;
+        font-weight: 400;
+        font-family:"avenir next", Arial, sans-serif;
+        padding: 6px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #FFA500;
+        border-radius: 1px;
+        pointer-events: none;
+    }
+
+    /* Creates a small triangle extender for the tooltip */
+    .d3-tip:after {      
+        box-sizing: border-box;
+        display: inline;
+        font-size: 8px;
+        width: 100%;
+        line-height: 1.5;
+        color: rgba(0, 0, 0, 0.6);
+        position: absolute;
+        pointer-events: none;
+
+    }
+
+    .links line {
+        stroke: #999;
+        stroke-opacity: 0.6;
+    }
+
+    .nodes circle {
+        stroke: #fff;
+        stroke-width: 1.5px;
+    }
+
+    .details{
+        color:white;
+    }
+    .node text {
+        pointer-events: none;
+        font: 10px sans-serif;
+    }
+
+</style>
+<body>
+    <h1 id="name" class="name">Nidhi Joshi</h1>
+
+    <h3 id="studentId" class="name">
+        <b>#01703510<b>
+                </h3>
+
+                <h3 id="coursetitle" >
+                    Data Visualization (DSC 530/CIS 602-02)
+                </h3>
+
+                <h4 id="assignment" class="assignment">
+                    Assignment #3
+                </h4>
+                <p>This assignment is all my own work. I did not copy or rewrite the code from any other source except the code given in the assignment.</p>
+                <p>I have used this link to get reference. <br>
+                    &nbsp;&nbsp;  <a href="http://bl.ocks.org/micahstubbs/8e15870eb432a21f0bc4d3d527b2d14f">1) For Top 20 Women's Soccer Players.</a><br>
+                    &nbsp;&nbsp;   <a href="http://bl.ocks.org/darrenjaworski/5874214">2) For gradient.</a><br>
+                </p>
+                <h1>1. Top 20 Women's Soccer Players</h1>
+                <div id="women"></div>
+                <h1>2. Top 100 Men's Soccer Players</h1>
+                <div id="men"></div>
+                <h1>3. Teammate Graph</h1>
+                <div id="force"></div>
+                <script src="http://d3js.org/d3.v4.min.js"></script>
+                <script src="http://d3js.org/queue.v1.min.js"></script>
+                <script src="http://d3js.org/topojson.v1.min.js"></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.2/d3.min.js"></script>
+                <script>
+                    queue()
+                            .defer(d3.json, "https://cdn.rawgit.com/johan/world.geo.json/master/countries.geo.json")
+                            .defer(d3.json, "http://www.cis.umassd.edu/~dkoop/dsc530-2017sp/a3/fifa-17-women.json")
+                            .defer(d3.json, "http://www.cis.umassd.edu/~dkoop/dsc530-2017sp/a3/guardian-16-men.json")
+                            .defer(d3.json, "http://www.cis.umassd.edu/~dkoop/dsc530-2017sp/a3/soccer-teammates-men.json")
+                            .await(processData);
+                    var margin = {top: 0, right: 0, bottom: 0, left: 0},
+                            width = 1060 - margin.left - margin.right,
+                            height = 600 - margin.top - margin.bottom;
+                    var path = d3.geoPath();
+                    var projection = d3.geoMercator()
+                            .scale(150)
+                            .translate([width / 2, height / 1.5]);
+
+                    path = d3.geoPath().projection(projection);
+
+                    function processData(error, data, women, men, teammate)
+                    {
+                        console.log("Errors", error)
+                        var svg = ready("#women", data, women, "Country", "Rating");
+                        forWomen(data, "Country", svg);
+                        var svg1 = ready("#men", data, men, "Nationality", "Rank");
+                        forMen(data, "Nationality", svg1);
+
+                        createForceLayout("#force", men, teammate)
+                    }
+
+                    function ready(div, data, population, Common, Notation)
+                    {
+                        var populationById = {};
+                        var svg = d3.select(div)
+                                .append("svg")
+                                .attr("width", width)
+                                .attr("height", height)
+                                .append('g')
+                                .attr('class', 'map');
+
+                        population.forEach(function (d) {
+
+                            populationById[d[Common]] = +d[Notation];
+                        });
+                        data.features.forEach(function (d) {
+                            d[Common] = populationById[d.properties.name]
+                        });
+                        return svg;
+
+                    }
+
+                    function forMen(data, common, svg)
+                    {
+                        var minimum = 10, maximum = 100;
+                        var minimumColor = "#e6debf", maximumColor = "#e8b904";
+                        var color = d3.scaleLinear().domain([minimum, maximum]).range([minimumColor, maximumColor]);
+
+                        svg.append("g")
+                                .attr("class", "countries")
+                                .selectAll("path")
+                                .data(data.features)
+                                .enter().append("path")
+                                .attr("d", path)
+                                .style("fill", function (d) {
+                                    return color(d.Nationality);
+                                })
+                                .style('stroke', 'white')
+                                .style('stroke-width', 1.5)
+                                .style("opacity", 0.8)
+                                // tooltips
+                                .style("stroke", "white")
+                                .style('stroke-width', 0.3);
+
+                        forPath(data, common, svg);
+                    }
+
+                    function forWomen(data, common, svg)
+                    {
+                        var sequentialScale = d3.scaleSequential()
+                                .domain([0, 100])
+                                .interpolator(d3.interpolateRainbow);
+
+                        svg.append("g")
+                                .attr("class", "countries")
+                                .selectAll("path")
+                                .data(data.features)
+                                .enter().append("path")
+                                .attr("d", path)
+                                .style('fill', function (d) {
+                                    return sequentialScale(d.Country);
+                                })
+                                .style('stroke', 'white')
+                                .style('stroke-width', 1.5)
+                                .style("opacity", 0.8)
+                                // tooltips
+                                .style("stroke", "white")
+                                .style('stroke-width', 0.3);
+
+                        forPath(data, common, svg);
+                    }
+
+                    function forPath(data, common, svg)
+                    {
+                        svg.append("path")
+                                .datum(topojson.mesh(data.features, function (a, b) {
+                                    return a[common] !== b[common];
+                                }))
+                                .attr("class", "names")
+                                .attr("d", path);
+                    }
+
+                    function createForceLayout(divid, trips, similarities)
+                    {
+                        var width = 900, height = 1000;
+                        var svg = d3.select(divid)
+                                .append("svg")
+                                .attr("width", width)
+                                .attr("height", height)
+
+
+
+                        var stops = new Object();
+                        function stopsFor(d) {
+                            //                console.log(d.Name);
+                            if (stops[d.Name]) {
+                                stops[d.Name].count = stops[d.Name].count + 1;
+                            } else {
+                                stops[d.Name] = {Name: d.Name, Nationality: d.Nationality, Position: d.Position, Rank: d.Rank, Club: d.Club, count: 0};
+                            }
+                        }
+
+
+                        trips.forEach(stopsFor);
+
+                        //            console.log(trips);
+                        function sort(a, b) {
+                            return d3.descending(stops[a].count, stops[b].count);
+                        }
+
+                        function map(d) {
+                            return stops[d];
+                        }
+
+
+
+                        var stops2 = Object.keys(stops).sort(sort);
+                        var stopmap = stops2.map(map);
+                        Object.size = function (obj)
+                        {
+                            var size = 0, key;
+                            for (key in obj)
+                            {
+                                if (obj.hasOwnProperty(key))
+                                    size++;
+                            }
+                            return size;
+                        };
+                        var size = Object.size(stopmap);
+                        var top10 = new Array();
+                        for (var i = 0; i < size; i++) {
+                            top10.push(stopmap[i]);
+                        }
+
+
+
+
+                        var links = new Array();
+                        for (var h = 0; h < similarities.length; h++)
+                        {
+                            //                console.log(similarities[h][0])
+                            var lteam, rteam, main1, main2;
+                            for (var j = 0; j < size; j++)
+                            {
+                                if (similarities[h][0] === top10[j]["Name"])
+                                {
+                                    lteam = top10[j]["Nationality"];
+                                    main1 = j;
+                                    break;
+                                }
+                            }
+
+                            for (var i = 0; i < size; i++)
+                            {
+                                if (similarities[h][1] === top10[i]["Name"])
+                                {
+                                    rteam = top10[i]["Nationality"];
+                                    main2 = i;
+                                    break;
+                                }
+                            }
+
+                            if (lteam === rteam)
+                            {
+                                links.push({source: top10[main1], target: top10[main2], s: 1});
+                            } else
+                            {
+                                links.push({source: top10[main2], target: top10[main1], s: 1});
+                            }
+                        }
+
+
+                        var sorted = rank(top10, "Nationality", "Name");
+                        //            console.log(sorted);
+                        var newTop10 = new Array()
+                        //console.log(top10);
+                        top10.forEach(totalCountFor);
+
+
+                        function totalCountFor(d) {
+
+
+                            for (var i = 0; i < sorted.length; i++)
+                            {
+                                //                    console.log(sorted[i]["value"] +"==="+ d.Nationality);
+                                if (sorted[i]["value"] === d.Nationality)
+                                {
+                                    d["totalCount"] = sorted[i]["count"];
+                                    newTop10.push(d);
+                                    //                            break;
+                                }
+                            }
+                        }
+                        //            var sorted = rank(top10, "Nationality","Name");
+                        //            console.log(newTop10);
+
+                        //            console.log(rank(newTop10, "Nationality", "Name"));
+
+                        var color = d3.scaleOrdinal(d3.schemeCategory20);
+                        var simulation = d3.forceSimulation()
+                                .force("link", d3.forceLink().id(function (d) {
+                                    return d.Name;
+                                }))
+                                .force("charge", d3.forceManyBody())
+                                .force("center", d3.forceCenter(width / 2, height / 2));
+                        var link = svg.append("g")
+                                .attr("class", "links")
+                                .selectAll("line")
+                                .data(links)
+                                .enter().append("line")
+                                .attr("stroke-width", function (d) {
+                                    return 1;
+                                });
+                        var node = svg.append("g")
+                                .attr("class", "nodes")
+                                .selectAll("circle")
+                                .data(newTop10)
+                                .enter().append("circle")
+                                .attr("r", 7)
+                                .attr("fill", function (d, i) {
+                                    if (9 >= d.totalCount)
+                                        return "#000000";
+                                    else
+                                        return color(i);
+                                })
+                                .call(d3.drag()
+                                        .on("start", dragstarted)
+                                        .on("drag", dragged)
+                                        .on("end", dragended));
+                        node.append("title")
+                                .text(function (d) {
+                                    return d.Name;
+                                });
+                        node.append("text")
+                                .attr("dx", 450)
+                                .attr("dy", ".70em")
+                                .text(function (d) {
+                                    return d.Name;
+                                });
+                        simulation
+                                .nodes(top10)
+                                .on("tick", ticked);
+                        simulation.force("link")
+                                .links(links);
+                        var seenNames = {};
+                        array = top10.filter(function (currentObject) {
+                            if (currentObject.Nationality in seenNames) {
+                                return false;
+                            } else
+                            {
+                                seenNames[currentObject.Nationality] = true;
+                                return true;
+                            }
+                        });
+                        var labels = svg.selectAll(".labels")
+                                .data(sorted)
+                                .enter().append("g");
+                        labels.append("rect")
+                                .attr("width", 20)
+                                .attr("height", 20)
+                                .attr("x", width - 200)
+                                .attr("y", function (d, i) {
+                                    return 10 + i * 25;
+                                })
+                                .style("fill", function (d, i) {
+                                    if (i > 9)
+                                        return "#000000";
+                                    else
+                                        return color(i);
+                                })
+
+                        labels.append("text")
+                                .attr("x", width - 170)
+                                .attr("y", function (d, i) {
+                                    return 25 + i * 25;
+                                })
+                                .text(function (d) {
+                                    return d.value;
+                                })
+
+
+                        function ticked() {
+                            link
+                                    .attr("x1", function (d) {
+                                        return d.source.x;
+                                    })
+                                    .attr("y1", function (d) {
+                                        return d.source.y;
+                                    })
+                                    .attr("x2", function (d) {
+                                        return d.target.x;
+                                    })
+                                    .attr("y2", function (d) {
+                                        return d.target.y;
+                                    });
+                            node
+                                    .attr("cx", function (d) {
+                                        return d.x;
+                                    })
+                                    .attr("cy", function (d) {
+                                        return d.y;
+                                    })
+
+                            //                        .attr("transform", function(d) {
+                            //                    return "translate(" + d.x + "," + d.y + ")";
+                            //                });
+                        }
+
+                        function rank(items, prop, prop1) {
+
+                            var results = {}
+                            var results1 = {}
+                            len = items.length;
+                            //                console.log(len);
+                            for (var i = 0; i < len; i++) {
+
+                                var value = items[i][prop];
+                                var Name = items[i][prop1];
+                                var count = (results[value] || 0) + 1;
+                                results[value] = count;
+                                results1[value] = Name;
+                            }
+                            var ranked = []
+
+                            for (var key in results) {
+                                if (results.hasOwnProperty(key)) {
+                                    ranked.push({value: key, count: results[key], Name: results1[key]});
+                                }
+                            }
+
+                            return ranked.sort(function (a, b) {
+                                return b.count - a.count;
+                            });
+                        }
+
+
+
+                        function dragstarted(d) {
+                            if (!d3.event.active)
+                                simulation.alphaTarget(1).restart();
+                            d.fx = d.x;
+                            d.fy = d.y;
+                        }
+
+                        function dragged(d) {
+                            d.fx = d3.event.x;
+                            d.fy = d3.event.y;
+                        }
+
+                        function dragended(d) {
+                            if (!d3.event.active)
+                                simulation.alphaTarget(0);
+                            d.fx = null;
+                            d.fy = null;
+                        }
+
+
+                    }
+
+
+                </script>
+                </body>
+                </html>
